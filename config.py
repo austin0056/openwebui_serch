@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/data/config.json"))
+CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/app/data/config.json"))
 
 
 class AppConfig(BaseModel):
