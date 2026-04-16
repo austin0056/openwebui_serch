@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SearXNG 代理搜索 - 管理面板</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container">
+  <h1>SearXNG 代理搜索服务</h1>
+  <p class="subtitle">配置 SOCKS5 静态住宅 IP 代理 &amp; 搜索参数</p>
+
+  <form id="configForm">
+    <div class="field">
+      <label for="socks5_proxy">SOCKS5 代理地址</label>
+      <input type="text" id="socks5_proxy" name="socks5_proxy"
+             placeholder="socks5://user:pass@host:port" value="{{ config.socks5_proxy }}">
+      <span class="hint">留空则直连（不使用代理）</span>
+    </div>
+
+    <div class="field">
+      <label for="searxng_url">SearXNG 实例地址</label>
+      <input type="text" id="searxng_url" name="searxng_url"
+             placeholder="http://127.0.0.1:8888" value="{{ config.searxng_url }}">
+    </div>
+
+    <div class="field">
+      <label for="num_results">默认搜索结果数量</label>
+      <input type="number" id="num_results" name="num_results"
+             min="1" max="20" value="{{ config.num_results }}">
+    </div>
+
+    <div class="field">
+      <label for="api_key">API 访问密钥</label>
+      <input type="text" id="api_key" name="api_key"
+             placeholder="留空则不验证" value="{{ config.api_key }}">
+      <span class="hint">Open WebUI Tool 调用时需要填入此密钥</span>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn btn-primary">保存配置</button>
+      <button type="button" class="btn btn-secondary" id="testBtn">测试代理连接</button>
+    </div>
+  </form>
+
+  <div id="message" class="message" style="display:none;"></div>
+
+  <hr>
+  <h2>快速测试搜索</h2>
+  <form id="searchForm">
+    <div class="field row">
+      <input type="text" id="searchQuery" placeholder="输入搜索关键词..." class="flex1">
+      <button type="submit" class="btn btn-primary">搜索</button>
+    </div>
+  </form>
+  <div id="searchResults"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+function showMsg(text, ok) {
+  const el = $('#message');
+  el.textContent = text;
+  el.className = 'message ' + (ok ? 'ok' : 'err');
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+$('#configForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const body = {
+    socks5_proxy: $('#socks5_proxy').value,
+    searxng_url: $('#searxng_url').value,
+    num_results: parseInt($('#num_results').value) || 5,
+    api_key: $('#api_key').value,
+  };
+  try {
+    const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await r.json();
+    showMsg(d.ok ? '配置已保存' : '保存失败', d.ok);
+  } catch(e) { showMsg('请求失败: ' + e.message, false); }
+});
+
+$('#testBtn').addEventListener('click', async () => {
+  $('#testBtn').disabled = true;
+  $('#testBtn').textContent = '测试中...';
+  try {
+    const r = await fetch('/api/test-proxy', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) showMsg('连接成功! 出口 IP: ' + d.ip + ' | 代理: ' + d.proxy, true);
+    else showMsg('连接失败: ' + d.error, false);
+  } catch(e) { showMsg('请求失败: ' + e.message, false); }
+  $('#testBtn').disabled = false;
+  $('#testBtn').textContent = '测试代理连接';
+});
+
+$('#searchForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const q = $('#searchQuery').value.trim();
+  if (!q) return;
+  const el = $('#searchResults');
+  el.innerHTML = '<p class="loading">搜索中...</p>';
+  try {
+    const r = await fetch('/api/search', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + $('#api_key').value},
+      body:JSON.stringify({query: q})
+    });
+    const d = await r.json();
+    if (d.results && d.results.length) {
+      el.innerHTML = d.results.map(i =>
+        `<div class="result"><a href="${i.url}" target="_blank">${i.title}</a><p>${i.snippet}</p><small>${i.url}</small></div>`
+      ).join('');
+    } else {
+      el.innerHTML = '<p>无结果</p>';
+    }
+  } catch(e) { el.innerHTML = '<p class="err">搜索失败: ' + e.message + '</p>'; }
+});
+</script>
+</body>
+</html>
