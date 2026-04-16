@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from config import get_config, save_config, load_config, AppConfig, ADMIN_PASSWORD, normalize_proxy, _PROXY_RE
+import httpx
 import searxng_client
 
 app = FastAPI(title="SearXNG Proxy Search", version="1.0.0")
@@ -127,7 +128,9 @@ async def api_search(body: SearchRequest, _: None = Depends(verify_api_key)):
             "search_engine": "searxng",
         }
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        cfg = get_config()
+        detail = f"搜索失败: {e} | SearXNG地址: {cfg.searxng_url}"
+        raise HTTPException(status_code=502, detail=detail)
 
 
 # --- 抓取网页 ---
@@ -160,4 +163,12 @@ async def api_test_proxy(request: Request):
 # --- 健康检查 ---
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    cfg = get_config()
+    searxng_ok = False
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(f"{cfg.searxng_url.rstrip('/')}/")
+            searxng_ok = r.status_code == 200
+    except Exception:
+        pass
+    return {"status": "ok", "searxng": searxng_ok, "searxng_url": cfg.searxng_url}
