@@ -1,10 +1,12 @@
+import os
+import secrets
 from pathlib import Path
-from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, Depends, HTTPException, Form
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from config import get_config, save_config, load_config, AppConfig
+from config import get_config, save_config, load_config, AppConfig, ADMIN_PASSWORD
 import searxng_client
 
 app = FastAPI(title="SearXNG Proxy Search", version="1.0.0")
@@ -13,11 +15,20 @@ BASE = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=BASE / "templates")
 
-# 启动时加载配置
 load_config()
 
+# 简单 token 会话管理
+_valid_tokens: set[str] = set()
 
-# --- 鉴权依赖 ---
+
+def check_admin(request: Request) -> None:
+    """检查管理面板登录状态"""
+    token = request.cookies.get("admin_token", "")
+    if token not in _valid_tokens:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+# --- API 鉴权 ---
 def verify_api_key(request: Request) -> None:
     cfg = get_config()
     if not cfg.api_key:
@@ -27,14 +38,43 @@ def verify_api_key(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
-# --- Web 面板 ---
+# --- 登录页 ---
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request, "error": ""})
+
+
+@app.post("/login")
+async def login_submit(request: Request, password: str = Form(...)):
+    if password == ADMIN_PASSWORD:
+        token = secrets.token_hex(32)
+        _valid_tokens.add(token)
+        resp = RedirectResponse(url="/", status_code=303)
+        resp.set_cookie("admin_token", token, httponly=True, max_age=86400)
+        return resp
+    return templates.TemplateResponse("login.html", {"request": request, "error": "密码错误"})
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    token = request.cookies.get("admin_token", "")
+    _valid_tokens.discard(token)
+    resp = RedirectResponse(url="/login", status_code=303)
+    resp.delete_cookie("admin_token")
+    return resp
+
+
+# --- Web 面板 (需登录) ---
 @app.get("/", response_class=HTMLResponse)
 async def panel(request: Request):
+    token = request.cookies.get("admin_token", "")
+    if token not in _valid_tokens:
+        return RedirectResponse(url="/login", status_code=303)
     cfg = get_config()
     return templates.TemplateResponse("index.html", {"request": request, "config": cfg})
 
 
-# --- 配置 API ---
+# --- 配置 API (需登录) ---
 class ConfigUpdate(BaseModel):
     socks5_proxy: str = ""
     searxng_url: str = "http://127.0.0.1:8888"
@@ -43,19 +83,22 @@ class ConfigUpdate(BaseModel):
 
 
 @app.get("/api/config")
-async def get_cfg():
+async def get_cfg(request: Request, _: None = Depends(check_admin)):
     cfg = get_config()
     return cfg.model_dump()
 
 
 @app.post("/api/config")
-async def update_cfg(body: ConfigUpdate):
+async def update_cfg(request: Request, body: ConfigUpdate):
+    token = request.cookies.get("admin_token", "")
+    if token not in _valid_tokens:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     cfg = AppConfig(**body.model_dump())
     save_config(cfg)
     return {"ok": True}
 
 
-# --- 搜索 API ---
+# --- 搜索 API (API Key 鉴权) ---
 class SearchRequest(BaseModel):
     query: str
     num_results: int | None = None
@@ -90,9 +133,12 @@ async def api_fetch(body: FetchRequest, _: None = Depends(verify_api_key)):
         raise HTTPException(status_code=502, detail=str(e))
 
 
-# --- 代理测试 ---
+# --- 代理测试 (需登录) ---
 @app.post("/api/test-proxy")
-async def api_test_proxy():
+async def api_test_proxy(request: Request):
+    token = request.cookies.get("admin_token", "")
+    if token not in _valid_tokens:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     try:
         result = await searxng_client.test_proxy()
         return result

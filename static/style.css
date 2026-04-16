@@ -27,3 +27,4 @@ hr { border: none; border-top: 1px solid #2a2d35; margin: 24px 0; }
 .result p { color: #aaa; font-size: 0.85rem; margin: 6px 0 4px; line-height: 1.5; }
 .result small { color: #555; font-size: 0.78rem; }
 .loading { color: #888; }
+.login-container { max-width: 400px; margin-top: 15vh; }

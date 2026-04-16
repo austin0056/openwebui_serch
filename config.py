@@ -4,6 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/app/data/config.json"))
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 
 class AppConfig(BaseModel):

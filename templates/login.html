@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 - SearXNG 代理搜索</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="container login-container">
+  <h1>SearXNG 代理搜索服务</h1>
+  <p class="subtitle">请输入管理密码</p>
+
+  {% if error %}
+  <div class="message err">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" action="/login">
+    <div class="field">
+      <label for="password">管理密码</label>
+      <input type="password" id="password" name="password" placeholder="输入密码..." autofocus required>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn btn-primary" style="width:100%">登录</button>
+    </div>
+  </form>
+</div>
+</body>
+</html>
