@@ -1,5 +1,4 @@
 import os
-import re
 import secrets
 from pathlib import Path
 from fastapi import FastAPI, Request, Depends, HTTPException, Form
@@ -7,10 +6,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from config import get_config, save_config, load_config, AppConfig, ADMIN_PASSWORD
+from config import get_config, save_config, load_config, AppConfig, ADMIN_PASSWORD, normalize_proxy, _PROXY_RE
 import searxng_client
-
-PROXY_RE = re.compile(r'^socks5h?://.+@.+:\d+$')
 
 app = FastAPI(title="SearXNG Proxy Search", version="1.0.0")
 
@@ -96,16 +93,20 @@ async def update_cfg(request: Request, body: ConfigUpdate):
     token = request.cookies.get("admin_token", "")
     if token not in _valid_tokens:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    proxy = body.socks5_proxy.strip()
-    if proxy and not PROXY_RE.match(proxy):
+    # 自动转换代理格式
+    proxy = normalize_proxy(body.socks5_proxy)
+    if proxy and not _PROXY_RE.match(proxy):
         return {
             "ok": False,
-            "error": "代理格式错误! 正确格式: socks5://用户名:密码@IP地址:端口"
+            "error": "代理格式错误! 支持的格式:\n"
+                     "① socks5://用户名:密码@IP:端口\n"
+                     "② socks5://IP:端口:用户名:密码\n"
+                     "③ IP:端口:用户名:密码"
         }
     body.socks5_proxy = proxy
     cfg = AppConfig(**body.model_dump())
     save_config(cfg)
-    return {"ok": True}
+    return {"ok": True, "normalized_proxy": proxy}
 
 
 # --- 搜索 API (API Key 鉴权) ---

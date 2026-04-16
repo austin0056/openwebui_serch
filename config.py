@@ -11,6 +11,35 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 _PROXY_RE = re.compile(r'^socks5h?://.+@.+:\d+$')
 
+# 代理商常见格式: socks5://IP:端口:用户名:密码
+_VENDOR_RE = re.compile(r'^(socks5h?)://([^:]+):(\d+):([^:]+):(.+)$')
+
+
+def normalize_proxy(raw: str) -> str:
+    """将各种代理格式统一转换为标准 socks5://user:pass@host:port 格式。"""
+    raw = raw.strip()
+    if not raw:
+        return ""
+
+    # 已经是标准格式
+    if _PROXY_RE.match(raw):
+        return raw
+
+    # 代理商格式: socks5://IP:端口:用户名:密码
+    m = _VENDOR_RE.match(raw)
+    if m:
+        scheme, host, port, user, passwd = m.groups()
+        return f"{scheme}://{user}:{passwd}@{host}:{port}"
+
+    # 无 scheme 的格式: IP:端口:用户名:密码
+    parts = raw.split(":")
+    if len(parts) == 4:
+        host, port, user, passwd = parts
+        if port.isdigit():
+            return f"socks5://{user}:{passwd}@{host}:{port}"
+
+    return raw
+
 SEARXNG_TEMPLATE = """use_default_settings: true
 
 server:
@@ -70,14 +99,23 @@ def load_config() -> AppConfig:
             _config = AppConfig()
     else:
         _config = AppConfig()
-    # 自动修复：清除格式错误的代理地址
-    if _config.socks5_proxy and not _PROXY_RE.match(_config.socks5_proxy):
-        _config.socks5_proxy = ""
-        try:
-            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            CONFIG_PATH.write_text(_config.model_dump_json(indent=2), encoding="utf-8")
-        except Exception:
-            pass
+    # 自动修复：转换非标准代理格式
+    if _config.socks5_proxy:
+        normalized = normalize_proxy(_config.socks5_proxy)
+        if normalized != _config.socks5_proxy:
+            _config.socks5_proxy = normalized
+            try:
+                CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+                CONFIG_PATH.write_text(_config.model_dump_json(indent=2), encoding="utf-8")
+            except Exception:
+                pass
+        # 转换后仍然不合法则清空
+        if _config.socks5_proxy and not _PROXY_RE.match(_config.socks5_proxy):
+            _config.socks5_proxy = ""
+            try:
+                CONFIG_PATH.write_text(_config.model_dump_json(indent=2), encoding="utf-8")
+            except Exception:
+                pass
     # 启动时也同步一次 SearXNG 代理
     _update_searxng_proxy(_config.socks5_proxy)
     return _config

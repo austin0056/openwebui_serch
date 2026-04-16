@@ -16,7 +16,7 @@
       <label for="socks5_proxy">SOCKS5 代理地址</label>
       <input type="text" id="socks5_proxy" name="socks5_proxy"
              placeholder="socks5://用户名:密码@IP地址:端口" value="{{ config.socks5_proxy }}">
-      <span class="hint">格式: socks5://用户名:密码@IP地址:端口 &nbsp;|&nbsp; 例: socks5://r7w69de:4yXLsD@1.2.3.4:45001 &nbsp;|&nbsp; 留空则直连</span>
+      <span class="hint">支持格式: ① socks5://用户名:密码@IP:端口 &nbsp;② socks5://IP:端口:用户名:密码 &nbsp;③ IP:端口:用户名:密码 &nbsp;|&nbsp; 留空则直连</span>
     </div>
 
     <div class="field">
@@ -69,13 +69,8 @@ function showMsg(text, ok) {
 
 $('#configForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const proxy = $('#socks5_proxy').value.trim();
-  if (proxy && !proxy.match(/^socks5h?:\/\/.+@.+:\d+$/)) {
-    showMsg('代理格式错误! 正确格式: socks5://用户名:密码@IP地址:端口', false);
-    return;
-  }
   const body = {
-    socks5_proxy: proxy,
+    socks5_proxy: $('#socks5_proxy').value.trim(),
     searxng_url: $('#searxng_url').value,
     num_results: parseInt($('#num_results').value) || 5,
     api_key: $('#api_key').value,
@@ -83,7 +78,12 @@ $('#configForm').addEventListener('submit', async e => {
   try {
     const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await r.json();
-    showMsg(d.ok ? '配置已保存 (SearXNG 正在重启...)' : (d.error || '保存失败'), d.ok);
+    if (d.ok) {
+      showMsg('配置已保存 (SearXNG 正在重启...)', true);
+      if (d.normalized_proxy) $('#socks5_proxy').value = d.normalized_proxy;
+    } else {
+      showMsg(d.error || '保存失败', false);
+    }
   } catch(e) { showMsg('请求失败: ' + e.message, false); }
 });
 
