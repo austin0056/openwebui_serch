@@ -93,8 +93,11 @@ async def api_fetch(body: FetchRequest, _: None = Depends(verify_api_key)):
 # --- 代理测试 ---
 @app.post("/api/test-proxy")
 async def api_test_proxy():
-    result = await searxng_client.test_proxy()
-    return result
+    try:
+        result = await searxng_client.test_proxy()
+        return result
+    except Exception as e:
+        return {"ok": False, "error": str(e), "proxy": "unknown"}
 
 
 # --- 健康检查 ---

@@ -18,7 +18,11 @@ async def search(query: str, num_results: int | None = None, language: str = "zh
     n = num_results or cfg.num_results
 
     proxy = cfg.socks5_proxy if cfg.socks5_proxy else None
-    transport = httpx.AsyncHTTPTransport(proxy=proxy) if proxy else None
+    transport = None
+    try:
+        transport = httpx.AsyncHTTPTransport(proxy=proxy) if proxy else None
+    except Exception:
+        pass
 
     params = {
         "q": query,
@@ -47,7 +51,11 @@ async def fetch_page(url: str) -> str:
     """通过代理抓取网页文本内容。"""
     cfg = get_config()
     proxy = cfg.socks5_proxy if cfg.socks5_proxy else None
-    transport = httpx.AsyncHTTPTransport(proxy=proxy) if proxy else None
+    transport = None
+    try:
+        transport = httpx.AsyncHTTPTransport(proxy=proxy) if proxy else None
+    except Exception:
+        pass
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -64,9 +72,9 @@ async def test_proxy() -> dict:
     """测试代理连通性，返回出口 IP 信息。"""
     cfg = get_config()
     proxy = cfg.socks5_proxy if cfg.socks5_proxy else None
-    transport = httpx.AsyncHTTPTransport(proxy=proxy) if proxy else None
 
     try:
+        transport = httpx.AsyncHTTPTransport(proxy=proxy) if proxy else None
         async with httpx.AsyncClient(transport=transport, timeout=15) as client:
             resp = await client.get("https://httpbin.org/ip")
             resp.raise_for_status()

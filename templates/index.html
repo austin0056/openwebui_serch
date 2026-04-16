@@ -87,9 +87,12 @@ $('#testBtn').addEventListener('click', async () => {
   $('#testBtn').textContent = '测试中...';
   try {
     const r = await fetch('/api/test-proxy', {method:'POST'});
-    const d = await r.json();
-    if (d.ok) showMsg('连接成功! 出口 IP: ' + d.ip + ' | 代理: ' + d.proxy, true);
-    else showMsg('连接失败: ' + d.error, false);
+    if (!r.ok) { showMsg('服务端错误: HTTP ' + r.status, false); }
+    else {
+      const d = await r.json();
+      if (d.ok) showMsg('连接成功! 出口 IP: ' + d.ip + ' | 代理: ' + d.proxy, true);
+      else showMsg('连接失败: ' + d.error, false);
+    }
   } catch(e) { showMsg('请求失败: ' + e.message, false); }
   $('#testBtn').disabled = false;
   $('#testBtn').textContent = '测试代理连接';
