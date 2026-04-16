@@ -93,7 +93,7 @@ def _update_searxng_proxy(socks5_proxy: str) -> None:
         return
 
     if socks5_proxy:
-        proxy_section = f"  proxies:\n    - {socks5_proxy}"
+        proxy_section = f'  proxies:\n    all://:\n      - {socks5_proxy}\n  extra_proxy_timeout: 10.0'
     else:
         proxy_section = ""
 

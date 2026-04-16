@@ -15,8 +15,8 @@
     <div class="field">
       <label for="socks5_proxy">SOCKS5 代理地址</label>
       <input type="text" id="socks5_proxy" name="socks5_proxy"
-             placeholder="socks5://user:pass@host:port" value="{{ config.socks5_proxy }}">
-      <span class="hint">留空则直连（不使用代理）</span>
+             placeholder="socks5://用户名:密码@IP地址:端口" value="{{ config.socks5_proxy }}">
+      <span class="hint">格式: socks5://用户名:密码@IP地址:端口 &nbsp;|&nbsp; 例: socks5://r7w69de:4yXLsD@1.2.3.4:45001 &nbsp;|&nbsp; 留空则直连</span>
     </div>
 
     <div class="field">
@@ -69,8 +69,13 @@ function showMsg(text, ok) {
 
 $('#configForm').addEventListener('submit', async e => {
   e.preventDefault();
+  const proxy = $('#socks5_proxy').value.trim();
+  if (proxy && !proxy.match(/^socks5h?:\/\/.+@.+:\d+$/)) {
+    showMsg('代理格式错误! 正确格式: socks5://用户名:密码@IP地址:端口', false);
+    return;
+  }
   const body = {
-    socks5_proxy: $('#socks5_proxy').value,
+    socks5_proxy: proxy,
     searxng_url: $('#searxng_url').value,
     num_results: parseInt($('#num_results').value) || 5,
     api_key: $('#api_key').value,
