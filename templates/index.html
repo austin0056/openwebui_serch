@@ -83,7 +83,7 @@ $('#configForm').addEventListener('submit', async e => {
   try {
     const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await r.json();
-    showMsg(d.ok ? '配置已保存' : '保存失败', d.ok);
+    showMsg(d.ok ? '配置已保存 (SearXNG 正在重启...)' : (d.error || '保存失败'), d.ok);
   } catch(e) { showMsg('请求失败: ' + e.message, false); }
 });
 

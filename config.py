@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -7,6 +8,8 @@ from pydantic import BaseModel, Field
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/data/config.json"))
 SEARXNG_SETTINGS = Path(os.getenv("SEARXNG_SETTINGS_PATH", "/etc/searxng/settings.yml"))
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+
+_PROXY_RE = re.compile(r'^socks5h?://.+@.+:\d+$')
 
 SEARXNG_TEMPLATE = """use_default_settings: true
 
@@ -67,6 +70,14 @@ def load_config() -> AppConfig:
             _config = AppConfig()
     else:
         _config = AppConfig()
+    # 自动修复：清除格式错误的代理地址
+    if _config.socks5_proxy and not _PROXY_RE.match(_config.socks5_proxy):
+        _config.socks5_proxy = ""
+        try:
+            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            CONFIG_PATH.write_text(_config.model_dump_json(indent=2), encoding="utf-8")
+        except Exception:
+            pass
     # 启动时也同步一次 SearXNG 代理
     _update_searxng_proxy(_config.socks5_proxy)
     return _config
