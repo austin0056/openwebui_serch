@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir searxng
 
 # 创建配置目录
-RUN mkdir -p /etc/searxng /app/data
+RUN mkdir -p /etc/searxng /data
 
 # 复制 SearXNG 配置
 COPY searxng/settings.yml /etc/searxng/settings.yml
@@ -31,7 +31,7 @@ COPY static/ static/
 # 复制 supervisord 配置
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# 如需持久化配置可挂载 /app/data 目录，不挂载也能正常运行
+# Zeabur 持久化硬盘挂载到 /data 目录
 
 EXPOSE 8080
 

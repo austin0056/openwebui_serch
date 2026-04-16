@@ -13,16 +13,9 @@ class SearchResult:
 
 
 async def search(query: str, num_results: int | None = None, language: str = "zh-CN") -> list[dict]:
-    """通过 SearXNG 搜索，支持 SOCKS5 代理出站。"""
+    """通过本地 SearXNG 搜索（SearXNG 自身通过代理出站）。"""
     cfg = get_config()
     n = num_results or cfg.num_results
-
-    proxy = cfg.socks5_proxy if cfg.socks5_proxy else None
-    transport = None
-    try:
-        transport = httpx.AsyncHTTPTransport(proxy=proxy) if proxy else None
-    except Exception:
-        pass
 
     params = {
         "q": query,
@@ -31,7 +24,8 @@ async def search(query: str, num_results: int | None = None, language: str = "zh
         "pageno": 1,
     }
 
-    async with httpx.AsyncClient(transport=transport, timeout=30) as client:
+    # 访问本地 SearXNG，不走代理
+    async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(f"{cfg.searxng_url.rstrip('/')}/search", params=params)
         resp.raise_for_status()
         data = resp.json()
@@ -48,7 +42,7 @@ async def search(query: str, num_results: int | None = None, language: str = "zh
 
 
 async def fetch_page(url: str) -> str:
-    """通过代理抓取网页文本内容。"""
+    """通过 SOCKS5 代理抓取网页文本内容。"""
     cfg = get_config()
     proxy = cfg.socks5_proxy if cfg.socks5_proxy else None
     transport = None
@@ -65,7 +59,7 @@ async def fetch_page(url: str) -> str:
     async with httpx.AsyncClient(transport=transport, timeout=30, follow_redirects=True) as client:
         resp = await client.get(url, headers=headers)
         resp.raise_for_status()
-        return resp.text[:50000]  # 限制返回长度
+        return resp.text[:50000]
 
 
 async def test_proxy() -> dict:
